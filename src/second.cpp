@@ -3,41 +3,41 @@
 #include <BLE2902.h>
 #include <M5Core2.h>
 #include <Adafruit_seesaw.h>
-#include <Arduino.h>
+
+///////////////////////////////////////////////////////////////
+// Forward Declarations
+///////////////////////////////////////////////////////////////
+void broadcastBleServer();
+void drawScreenTextWithBackground(String text, int backgroundColor);
+static void notifyXCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify);
+static void notifyYCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify);
+bool connectToServer();
+void drawDots(uint32_t xJoyIn, uint32_t yJoyIn, uint32_t xButIn, uint32_t yButIn);
+void joyAccelIncrement();
+// void butAccelIncrement();
+String milis_to_seconds(long milis);
+void playGame();
+void endGame();
+bool checkDistance();
+
+///////////////////////////////////////////////////////////////
+// Game Variables
+///////////////////////////////////////////////////////////////
+#define BUTTON_SELECT    0
+#define BUTTON_START    16
 
 // State
 enum Screen { S_GAME, S_GAME_OVER };
 static Screen screen = S_GAME;
 
-// method header definitions
-void drawDots(uint32_t xJoyIn, uint32_t yJoyIn); // , uint32_t xButIn, uint32_t yButIn);
-void joyAccelIncrement();
-void warpDot();
-String milis_to_seconds(long milis);
-void playGame();
-void endGame();
-bool checkDistance();
+// Regular Variables
 unsigned long lastTime = 0;
-
-// Initialize Variables
-Adafruit_seesaw gamePad;
-
-// #define BUTTON_X         6
-// #define BUTTON_Y         2
-// #define BUTTON_A         5
-// #define BUTTON_B         1
-#define BUTTON_SELECT    0
-#define BUTTON_START    16
-// uint32_t button_mask = (1UL << BUTTON_X) | (1UL << BUTTON_Y) | (1UL << BUTTON_START) |
-//                        (1UL << BUTTON_A) | (1UL << BUTTON_B) | (1UL << BUTTON_SELECT);
+int xJoy = 300, yJoy = 120, xRemote = 0, yRemote = 0;
+int joyAccel = 1;
 uint32_t button_mask = (1ul << BUTTON_START) | (1UL << BUTTON_SELECT);
 
-// gamepad variables
-int last_x = 0, last_y = 0;
-// joystick and button coordinates
-int xJoy = 10, yJoy = 120, xRemote = 0, yRemote = 0;
-// joystick and button acceleration
-int joyAccel = 1; // , butAccel = 1;
+// Gamepad
+Adafruit_seesaw gamePad;
 
 ///////////////////////////////////////////////////////////////
 // Server Variables
@@ -51,9 +51,9 @@ bool previouslyConnected = false;
 int timer = 0;
 
 // See the following for generating UUIDs: https://www.uuidgenerator.net/
-#define SERVICE_UUID "firstM5Core"
-#define CHARACTERISTIC_UUID_X "firstXCoordinate"
-#define CHARACTERISTIC_UUID_Y "firstYCoordinate"
+#define SERVICE_UUID "secondM5Core"
+#define CHARACTERISTIC_UUID_X "secondXCoordinate"
+#define CHARACTERISTIC_UUID_Y "secondYCoordinate"
 
 ///////////////////////////////////////////////////////////////
 // Client Variables
@@ -65,9 +65,9 @@ static boolean doConnect = false;
 static boolean doScan = false;
 bool remoteDeviceConnected = false;
 
-static BLEUUID REMOTE_SERVICE_UUID("secondM5Core");
-static BLEUUID REMOTE_CHARACTERISTIC_UUID_X("secondXCoordinate");
-static BLEUUID REMOTE_CHARACTERISTIC_UUID_Y("secondYCoordinate");
+static BLEUUID REMOTE_SERVICE_UUID("firstM5Core");
+static BLEUUID REMOTE_CHARACTERISTIC_UUID_X("firstXCoordinate");
+static BLEUUID REMOTE_CHARACTERISTIC_UUID_Y("firstYCoordinate");
 
 ///////////////////////////////////////////////////////////////
 // BLE Server Callback Methods
@@ -83,15 +83,6 @@ class MyServerCallbacks: public BLEServerCallbacks {
         Serial.println("Device disconnected...");
     }
 };
-
-///////////////////////////////////////////////////////////////
-// Forward Declarations
-///////////////////////////////////////////////////////////////
-void broadcastBleServer();
-void drawScreenTextWithBackground(String text, int backgroundColor);
-bool connectToServer();
-static void notifyXCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify);
-static void notifyYCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify);
 
 ///////////////////////////////////////////////////////////////
 // BLE Client Callback Methods
@@ -126,13 +117,13 @@ class MyClientCallback : public BLEClientCallbacks
 {
     void onConnect(BLEClient *pclient)
     {
-        remoteDeviceConnected = true;
+        deviceConnected = true;
         Serial.println("Device connected...");
     }
 
     void onDisconnect(BLEClient *pclient)
     {
-        remoteDeviceConnected = false;
+        deviceConnected = false;
         Serial.println("Device disconnected...");
     }
 };
@@ -140,7 +131,8 @@ class MyClientCallback : public BLEClientCallbacks
 ///////////////////////////////////////////////////////////////
 // Method is called to connect to server
 ///////////////////////////////////////////////////////////////
-bool connectToServer() {
+bool connectToServer()
+{
     // Create the client
     Serial.printf("Forming a connection to %s\n", bleRemoteServer->getName().c_str());
     BLEClient *bleClient = BLEDevice::createClient();
@@ -153,7 +145,7 @@ bool connectToServer() {
     Serial.printf("\tConnected to server (%s)\n", bleRemoteServer->getName().c_str());
 
     // Obtain a reference to the service we are after in the remote BLE server.
-    BLERemoteService *bleRemoteService = bleClient->getService(REMOTE_SERVICE_UUID);
+    BLERemoteService *bleRemoteService = bleClient->getService(SERVICE_UUID);
     if (bleRemoteService == nullptr) {
         Serial.printf("Failed to find our service UUID: %s\n", REMOTE_SERVICE_UUID.toString().c_str());
         bleClient->disconnect();
@@ -213,7 +205,8 @@ bool connectToServer() {
 // Scan for BLE servers and find the first one that advertises
 // the service we are looking for.
 ///////////////////////////////////////////////////////////////
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks
+{
     /**
      * Called for each advertising BLE server.
      */
@@ -226,7 +219,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         // We have found a device, let us now see if it contains the service we are looking for.
         if (advertisedDevice.haveServiceUUID() && 
                 advertisedDevice.isAdvertisingService(REMOTE_SERVICE_UUID) && 
-                advertisedDevice.getName() == "Second M5Core2") {
+                advertisedDevice.getName() == "First M5Core2") {
             BLEDevice::getScan()->stop();
             bleRemoteServer = new BLEAdvertisedDevice(advertisedDevice);
             doConnect = true;
@@ -239,19 +232,22 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 ///////////////////////////////////////////////////////////////
 // Put your setup code here, to run once
 ///////////////////////////////////////////////////////////////
-void setup() {
+void setup()
+{
     // Init device
     M5.begin();
     M5.Lcd.setTextSize(3);
-    
-    //Server Init
+
     // Initialize M5Core2 as a BLE server
     Serial.print("Starting BLE...");
-    String bleDeviceName = "First M5Core2";
+    String bleDeviceName = "Second M5Core2";
     BLEDevice::init(bleDeviceName.c_str());
 
-    //Service Init
-    
+    // Broadcast the BLE server
+    drawScreenTextWithBackground("Initializing BLE...", TFT_CYAN);
+    broadcastBleServer();
+    drawScreenTextWithBackground("Broadcasting as BLE server named:\n\n" + bleDeviceName, TFT_BLUE);
+
     // Retrieve a Scanner and set the callback we want to use to be informed when we
     // have detected a new device.  Specify that we want active scanning and start the
     // scan to run for 5 seconds.
@@ -277,13 +273,7 @@ void setup() {
         }
     }
 
-    // Broadcast the BLE server
-    drawScreenTextWithBackground("Initializing BLE...", TFT_CYAN);
-    broadcastBleServer();
-    drawScreenTextWithBackground("Broadcasting as BLE server named:\n\n" + bleDeviceName, TFT_BLUE);
-    
     // Sets up Gamepad QT
-
     if(!gamePad.begin(0x50)){
         Serial.println("ERROR! seesaw not found");
         while(1) delay(1);
@@ -295,22 +285,23 @@ void setup() {
 ///////////////////////////////////////////////////////////////
 // Put your main code here, to run repeatedly
 ///////////////////////////////////////////////////////////////
-void loop() {
+void loop()
+{
     if (deviceConnected) {
 
-        // Ping pong code
-        bool stillPlaying = checkDistance();
+        //TODO: Add ping pong code
+        
+    bool stillPlaying = checkDistance();
 
-        if (screen == S_GAME && stillPlaying) {
-            playGame();
-        } else {
-            if (lastTime == 0) {
-            lastTime = millis();
-            }
-            endGame();
-            delay(50000);
+    if (screen == S_GAME && stillPlaying) {
+        playGame();
+    } else {
+        if (lastTime == 0) {
+        lastTime = millis();
         }
-
+        endGame();
+        delay(50000);
+    }
 
     } else if (previouslyConnected) {
         drawScreenTextWithBackground("Disconnected. Reset M5 device to reinitialize BLE.", TFT_RED); // Give feedback on screen
@@ -338,7 +329,7 @@ void broadcastBleServer() {
     bleServer = BLEDevice::createServer();
     bleServer->setCallbacks(new MyServerCallbacks());
     bleService = bleServer->createService(SERVICE_UUID);
-    //TODO
+        //TODO
     bleCharacteristicX = bleService->createCharacteristic(CHARACTERISTIC_UUID_X,
         BLECharacteristic::PROPERTY_READ |
         BLECharacteristic::PROPERTY_NOTIFY |
@@ -354,7 +345,6 @@ void broadcastBleServer() {
     );
     //TODO
     bleCharacteristicX->setValue(yJoy);
-
     bleService->start();
 
     // Start broadcasting (advertising) BLE service
@@ -368,7 +358,6 @@ void broadcastBleServer() {
     Serial.println("Characteristic defined...you can connect with your phone!"); 
 
 }
-
 
 /////////////////////////////
 // dots
