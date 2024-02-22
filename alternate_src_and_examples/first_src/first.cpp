@@ -296,7 +296,7 @@ void setup() {
 // Put your main code here, to run repeatedly
 ///////////////////////////////////////////////////////////////
 void loop() {
-    if (deviceConnected) {
+    if (remoteDeviceConnected) {
 
         // Ping pong code
         bool stillPlaying = checkDistance();

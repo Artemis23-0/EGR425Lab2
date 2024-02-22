@@ -287,7 +287,7 @@ void setup()
 ///////////////////////////////////////////////////////////////
 void loop()
 {
-    if (deviceConnected) {
+    if (remoteDeviceConnected) {
 
         //TODO: Add ping pong code
         
