@@ -260,7 +260,7 @@ void setup() {
     pBLEScan->setInterval(1349);
     pBLEScan->setWindow(449);
     pBLEScan->setActiveScan(true);
-    pBLEScan->start(5, false);
+    pBLEScan->start(0, false);
 
     if (doConnect == true)
     {
