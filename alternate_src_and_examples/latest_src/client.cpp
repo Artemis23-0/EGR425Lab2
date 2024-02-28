@@ -81,7 +81,7 @@ static void notifyXCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, u
     Serial.printf("Notify callback for characteristic %s of data length %d\n", pBLERemoteCharacteristic->getUUID().toString().c_str(), length);
       xServer = (int32_t)(pData[3] << 24 | pData[2] << 16 | pData[1] << 8 | pData[0]);
       Serial.printf("\tValue was: %i", xServer);
-      delay(1000);
+      delay(10);
 }
 
 static void notifyYCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
@@ -90,7 +90,7 @@ static void notifyYCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, u
     Serial.printf("Notify callback for characteristic %s of data length %d\n", pBLERemoteCharacteristic->getUUID().toString().c_str(), length);
           yServer = (int32_t)(pData[3] << 24 | pData[2] << 16 | pData[1] << 8 | pData[0]);
       Serial.printf("\tValue was: %i", yServer);
-      delay(1000);
+      delay(10);
 }
 
 ///////////////////////////////////////////////////////////////
@@ -110,7 +110,6 @@ class MyClientCallback : public BLEClientCallbacks
     {
         deviceConnected = false;
         Serial.println("Device disconnected...");
-        //drawScreenTextWithBackground("LOST connection to device.\n\nAttempting re-connection...", TFT_RED);
     }
 };
 
@@ -261,6 +260,10 @@ void loop()
         if (connectToServer()) {
             Serial.println("We are now connected to the BLE Server.");
             drawScreenTextWithBackground("Connected to BLE server: " + String(bleRemoteServer->getName().c_str()), TFT_GREEN);
+            String x = String(xClient);
+            bleReadWriteXCharacteristic->writeValue(x.c_str(), false);
+            String y = String(yClient);
+            bleReadWriteYCharacteristic->writeValue(y.c_str(), false);
             doConnect = false;
             delay(3000);
         }

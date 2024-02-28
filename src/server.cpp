@@ -20,7 +20,8 @@ bool deviceConnected = false;
 bool previouslyConnected = false;
 int timer = 0;
 unsigned long lastTime = 0;
-unsigned long timerDelay = 2000;
+unsigned long timerDelay = 500;
+bool locationWasUpdated = true;
 
 // Unique IDs
 #define SERVICE_UUID "7d7a7768-a9d0-4fb8-bf2b-fc994c662eb6"
@@ -51,6 +52,13 @@ int acceleration = 1;
 class MyServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer *pServer) {
         deviceConnected = true;
+        bleReadXCharacteristic->setValue(xServer);
+        bleReadYCharacteristic->setValue(yServer);
+        
+        bleReadXCharacteristic->notify();
+        delay(10);
+        bleReadYCharacteristic->notify();
+        delay(10);
         previouslyConnected = true;
         Serial.println("Device connected...");
     }
@@ -175,6 +183,15 @@ void setup()
     }
     gamePad.pinModeBulk(button_mask, INPUT_PULLUP);
     gamePad.setGPIOInterrupts(button_mask, 1);
+    for (int i = 0; i < 10; i++) {
+      bleReadXCharacteristic->setValue(xServer);
+      bleReadYCharacteristic->setValue(yServer);
+      
+      bleReadXCharacteristic->notify();
+      delay(10);
+      bleReadYCharacteristic->notify();
+      delay(500);
+    }
 }
 
 ///////////////////////////////////////////////////////////////
@@ -187,16 +204,16 @@ void loop()
       bool stillPlaying = checkDistance();
       if (screen == S_GAME && stillPlaying) {
         playGame();
-        if ((millis() - lastTime) > timerDelay) {
+        if (locationWasUpdated) {
         bleReadXCharacteristic->setValue(xServer);
         bleReadYCharacteristic->setValue(yServer);
         
         bleReadXCharacteristic->notify();
-        delay(500);
+        delay(10);
         bleReadYCharacteristic->notify();
-        delay(500);
-        lastTime = millis();
+        delay(10);
       }
+      locationWasUpdated = false;
       } else {
         if (timer == 0) {
         timer = millis();
@@ -316,12 +333,14 @@ void playGame() {
     for (int i = 0; i < acceleration; i++) {
       if ((xServer + 1) < 320) {
         xServer++;
+        locationWasUpdated = true;
       }
     }
   } else if (x < 500) {
     for (int i = 0; i < acceleration; i++) {
       if ((xServer - 1) > 0) {
         xServer--;
+        locationWasUpdated = true;
       }
     }
   }
@@ -330,12 +349,14 @@ void playGame() {
     for (int i = 0; i < acceleration; i++) {
       if ((yServer + 1) < 240) {
         yServer++;
+        locationWasUpdated = true;
       }
     }
   } else if (y > 560) {
     for (int i = 0; i < acceleration; i++) {
       if ((yServer - 1) > 0) {
         yServer--;
+        locationWasUpdated = true;
       }
     }
   }
