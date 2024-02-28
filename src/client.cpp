@@ -64,17 +64,6 @@ void warpDot();
 // connected to NOTIFIES this client (or any client listening)
 // that it has changed the remote characteristic
 ///////////////////////////////////////////////////////////////
-int parse_notify( uint8_t *input, size_t size ) {
-int i, val;
-
-val = 0;
-
-for (int i = 0 ; i < size; i++ )
-
-    val = val * 10 + input[i];
-
-return( val );
-}
 static void notifyXCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
 {
     String characteristicUUID = pBLERemoteCharacteristic->getUUID().toString().c_str();
