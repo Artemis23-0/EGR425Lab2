@@ -64,26 +64,34 @@ void warpDot();
 // connected to NOTIFIES this client (or any client listening)
 // that it has changed the remote characteristic
 ///////////////////////////////////////////////////////////////
+int parse_notify( uint8_t *input, size_t size ) {
+int i, val;
+
+val = 0;
+
+for (int i = 0 ; i < size; i++ )
+
+    val = val * 10 + input[i];
+
+return( val );
+}
 static void notifyXCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
 {
+    String characteristicUUID = pBLERemoteCharacteristic->getUUID().toString().c_str();
     Serial.printf("Notify callback for characteristic %s of data length %d\n", pBLERemoteCharacteristic->getUUID().toString().c_str(), length);
-    Serial.printf("\tData: %s", (char *)pData);
-    std::string readXValue = pBLERemoteCharacteristic->readValue();
-    String valXStr = readXValue.c_str();
-    xServer = valXStr.toInt();
-    Serial.printf("\tValue was: %s", readXValue.c_str());
+      xServer = (int32_t)(pData[3] << 24 | pData[2] << 16 | pData[1] << 8 | pData[0]);
+      Serial.printf("\tValue was: %i", xServer);
+      delay(1000);
 }
 
 static void notifyYCallback(BLERemoteCharacteristic *pBLERemoteCharacteristic, uint8_t *pData, size_t length, bool isNotify)
 {
+    String characteristicUUID = pBLERemoteCharacteristic->getUUID().toString().c_str();
     Serial.printf("Notify callback for characteristic %s of data length %d\n", pBLERemoteCharacteristic->getUUID().toString().c_str(), length);
-    Serial.printf("\tData: %s", (char *)pData);
-    std::string readYValue = pBLERemoteCharacteristic->readValue();
-    String valYStr = readYValue.c_str();
-    yServer = valYStr.toInt();
-    Serial.printf("\tValue was: %s", readYValue.c_str());
+          yServer = (int32_t)(pData[3] << 24 | pData[2] << 16 | pData[1] << 8 | pData[0]);
+      Serial.printf("\tValue was: %i", yServer);
+      delay(1000);
 }
-
 
 ///////////////////////////////////////////////////////////////
 // BLE Server Callback Method
@@ -165,10 +173,14 @@ bool connectToServer()
     Serial.printf("\tFound our characteristic UUID: %s\n", READ_WRITE_Y_CHARACTERISTIC_UUID.toString().c_str());
     
     // Check if server's characteristic can notify client of changes and register to listen if so
-    if (bleReadXCharacteristic->canNotify())
-        bleReadXCharacteristic->registerForNotify(notifyXCallback);
-    if (bleReadYCharacteristic->canNotify())
-        bleReadYCharacteristic->registerForNotify(notifyYCallback);
+    if (bleReadXCharacteristic->canNotify()) {
+      Serial.println("X can notify");
+      bleReadXCharacteristic->registerForNotify(notifyXCallback);
+    }
+    if (bleReadYCharacteristic->canNotify()) {
+      Serial.println("Y can notify");
+      bleReadYCharacteristic->registerForNotify(notifyYCallback);
+    }
     return true;
 }
 
@@ -266,10 +278,6 @@ void loop()
         bool stillPlaying = checkDistance();
           if (screen == S_GAME && stillPlaying) {
             playGame();
-              Serial.print("XClient: ");
-  Serial.println(xClient);
-  Serial.print("YClient: ");
-  Serial.println(yClient);
         } else {
             if (timer == 0) {
             timer = millis();
@@ -328,7 +336,6 @@ void endGame() {
 }
 
 void drawDots(uint32_t serverX, uint32_t serverY, uint32_t clientX, uint32_t clientY){
-  Serial.println("Drawing dots on client's device");
   M5.Lcd.drawPixel(serverX, serverY, TFT_BLUE);
   M5.Lcd.drawPixel(clientX, clientY, TFT_RED);
 }
@@ -388,7 +395,6 @@ void playGame() {
     delay(500);
   }
 
-  Serial.println("About to draw dots to client device");
   drawDots(xServer, yServer, xClient, yClient); 
 }
 

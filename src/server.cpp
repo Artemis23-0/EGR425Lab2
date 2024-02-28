@@ -19,6 +19,8 @@ BLECharacteristic *bleReadWriteYCharacteristic;
 bool deviceConnected = false;
 bool previouslyConnected = false;
 int timer = 0;
+unsigned long lastTime = 0;
+unsigned long timerDelay = 2000;
 
 // Unique IDs
 #define SERVICE_UUID "7d7a7768-a9d0-4fb8-bf2b-fc994c662eb6"
@@ -67,20 +69,6 @@ class MyCharacteristicCallbacks: public BLECharacteristicCallbacks {
         String characteristicUUID = pCharacteristic->getUUID().toString().c_str();
         String characteristicValue = pCharacteristic->getValue().c_str();
         Serial.printf("Client JUST read from %s: %s", characteristicUUID, characteristicValue.c_str());
-
-        // // check if it is x or y and update the coordinates of the server's dot
-        // if (characteristicUUID.equals(READ_X_CHARACTERISTIC_UUID)) {
-        //     // update x
-        //     std::string readXValue = pCharacteristic->getValue();
-        //     String valXStr = readXValue.c_str();
-        //     xClient = valXStr.toInt();
-        // }
-        // if (characteristicUUID.equals(READ_Y_CHARACTERISTIC_UUID)) {
-        //     // update y
-        //     std::string readYValue = pCharacteristic->getValue();
-        //     String valYStr = readYValue.c_str();
-        //     yClient = valYStr.toInt();
-        // }
     }
     
     // callback function to support a write request
@@ -196,21 +184,30 @@ void loop()
 {
     M5.update();
     if (deviceConnected) {
-        bool stillPlaying = checkDistance();
-        if (screen == S_GAME && stillPlaying) {
-          playGame();
-        } else {
-          if (timer == 0) {
-          timer = millis();
-          }
-          endGame();
-          delay(50000);
+      bool stillPlaying = checkDistance();
+      if (screen == S_GAME && stillPlaying) {
+        playGame();
+        if ((millis() - lastTime) > timerDelay) {
+        bleReadXCharacteristic->setValue(xServer);
+        bleReadYCharacteristic->setValue(yServer);
+        
+        bleReadXCharacteristic->notify();
+        delay(500);
+        bleReadYCharacteristic->notify();
+        delay(500);
+        lastTime = millis();
+      }
+      } else {
+        if (timer == 0) {
+        timer = millis();
         }
+        endGame();
+        delay(50000);
+      }
     } else if (previouslyConnected) {
       drawScreenTextWithBackground("Disconnected. Reset M5 device to reinitialize BLE.", TFT_RED); // Give feedback on screen
       timer = 0;
     }
-    delay(500);
 }
 
 ///////////////////////////////////////////////////////////////
@@ -319,18 +316,12 @@ void playGame() {
     for (int i = 0; i < acceleration; i++) {
       if ((xServer + 1) < 320) {
         xServer++;
-        String x = String(xServer);
-        bleReadXCharacteristic->setValue(x.c_str());
-        bleReadXCharacteristic->notify();
       }
     }
   } else if (x < 500) {
     for (int i = 0; i < acceleration; i++) {
       if ((xServer - 1) > 0) {
         xServer--;
-        String x = String(xServer);
-        bleReadXCharacteristic->setValue(x.c_str());
-        bleReadXCharacteristic->notify();
       }
     }
   }
@@ -339,18 +330,12 @@ void playGame() {
     for (int i = 0; i < acceleration; i++) {
       if ((yServer + 1) < 240) {
         yServer++;
-        String y = String(yServer);
-        bleReadYCharacteristic->setValue(y.c_str());
-        bleReadYCharacteristic->notify();
       }
     }
   } else if (y > 560) {
     for (int i = 0; i < acceleration; i++) {
       if ((yServer - 1) > 0) {
         yServer--;
-        String y = String(yServer);
-        bleReadYCharacteristic->setValue(y.c_str());
-        bleReadYCharacteristic->notify();
       }
     }
   }
@@ -364,7 +349,7 @@ void playGame() {
   }
   if (! (buttons & (1UL << BUTTON_START))) {
     warpDot();
-    delay(500);
+    delay(1000);
   }
 
   drawDots(xServer, yServer, xClient, yClient); 
@@ -381,7 +366,9 @@ void warpDot() {
   bleReadYCharacteristic->setValue(yServer);
 
   bleReadXCharacteristic->notify();
+  delay(10);
   bleReadYCharacteristic->notify();
+  delay(10);
 }
 
 void drawDots(uint32_t serverX, uint32_t serverY, uint32_t clientX, uint32_t clientY){
